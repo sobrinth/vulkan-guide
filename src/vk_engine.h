@@ -5,6 +5,25 @@
 
 #include <vk_types.h>
 
+struct DeletionQueue
+{
+    std::deque<std::function<void()>> deletors; // not really efficient for a lot of objects, but ok for this small thing
+
+    void push_function(std::function<void()>&& function)
+    {
+        deletors.push_back(function);
+    }
+
+    void flush()
+    {
+        for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
+        {
+            (*it)(); // call functors
+        }
+
+        deletors.clear();
+    }
+};
 
 struct FrameData
 {
@@ -13,6 +32,8 @@ struct FrameData
 
     VkCommandPool _commandPool;
     VkCommandBuffer _mainCommandBuffer;
+
+    DeletionQueue _deletionQueue;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -47,6 +68,10 @@ public:
     std::vector<VkImage> _swapchainImages;
     std::vector<VkImageView> _swapchainImageViews;
     VkExtent2D _swapchainExtent;
+
+    DeletionQueue _mainDeletionQueue;
+
+    VmaAllocator _allocator;
 
     static VulkanEngine& Get();
 
