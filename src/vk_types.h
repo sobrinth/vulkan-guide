@@ -20,7 +20,6 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-
 #define VK_CHECK(x)                                                     \
     do {                                                                \
         VkResult err = x;                                               \
@@ -29,3 +28,12 @@
             abort();                                                    \
         }                                                               \
     } while (0)
+
+struct AllocatedImage
+{
+    VkImage image;
+    VkImageView imageView;
+    VmaAllocation allocation;
+    VkExtent3D imageExtent;
+    VkFormat imageFormat;
+};

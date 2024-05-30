@@ -90,6 +90,46 @@ void VulkanEngine::cleanup()
     loadedEngine = nullptr;
 }
 
+void VulkanEngine::run()
+{
+    SDL_Event e;
+    bool bQuit = false;
+
+    // main loop
+    while (!bQuit)
+    {
+        // Handle events on queue
+        while (SDL_PollEvent(&e) != 0)
+        {
+            // close the window when user alt-f4s or clicks the X button
+            if (e.type == SDL_QUIT)
+                bQuit = true;
+
+            if (e.type == SDL_WINDOWEVENT)
+            {
+                if (e.window.event == SDL_WINDOWEVENT_MINIMIZED)
+                {
+                    stop_rendering = true;
+                }
+                if (e.window.event == SDL_WINDOWEVENT_RESTORED)
+                {
+                    stop_rendering = false;
+                }
+            }
+        }
+
+        // do not draw if we are minimized
+        if (stop_rendering)
+        {
+            // throttle the speed to avoid the endless spinning
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+
+        draw();
+    }
+}
+
 void VulkanEngine::draw()
 {
     // wait until the gpu has finished rendering the last frame. Timeout of 1 second
@@ -113,25 +153,27 @@ void VulkanEngine::draw()
     VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(
         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
+    _drawExtent.width = _drawImage.imageExtent.width;
+    _drawExtent.height = _drawImage.imageExtent.height;
+
     // start the command buffer recording
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    // make the swapchain image into writable mode before rendering
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED,
-                             VK_IMAGE_LAYOUT_GENERAL);
-    VkClearColorValue clearValue;
-    float flash = std::abs(std::sin(_frameNumber / 120.f));
-    clearValue = {{0.0f, 0.0f, flash, 1.0f}};
+    // transition our main image into general layout so we can write into it
+    // we will overwrite it all so we don't care about what was the older layout
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-    VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+    draw_background(cmd);
 
-    // clear image
-    vkCmdClearColorImage(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1,
-                         &clearRange);
+    // transition the draw image and the swapchain image into their correct transfer layouts
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    // make the swapchain image into presentable mode
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL,
-                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    // execute a copy from the draw image into the swapchain
+    vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
+
+    // set swapchain image layout to Present so we can show it on the screen
+    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     // finalize the commandbuffer (we can no longer add commands, but it can now be executed)
     VK_CHECK(vkEndCommandBuffer(cmd));
@@ -171,46 +213,6 @@ void VulkanEngine::draw()
 
     // increase the number of frames drawn
     _frameNumber++;
-}
-
-void VulkanEngine::run()
-{
-    SDL_Event e;
-    bool bQuit = false;
-
-    // main loop
-    while (!bQuit)
-    {
-        // Handle events on queue
-        while (SDL_PollEvent(&e) != 0)
-        {
-            // close the window when user alt-f4s or clicks the X button
-            if (e.type == SDL_QUIT)
-                bQuit = true;
-
-            if (e.type == SDL_WINDOWEVENT)
-            {
-                if (e.window.event == SDL_WINDOWEVENT_MINIMIZED)
-                {
-                    stop_rendering = true;
-                }
-                if (e.window.event == SDL_WINDOWEVENT_RESTORED)
-                {
-                    stop_rendering = false;
-                }
-            }
-        }
-
-        // do not draw if we are minimized
-        if (stop_rendering)
-        {
-            // throttle the speed to avoid the endless spinning
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
-
-        draw();
-    }
 }
 
 void VulkanEngine::init_vulkan()
@@ -284,6 +286,47 @@ void VulkanEngine::init_vulkan()
 void VulkanEngine::init_swapchain()
 {
     create_swapchain(_windowExtent.width, _windowExtent.height);
+
+    // draw image size wil match the window
+    VkExtent3D drawImageExtent = {
+        _windowExtent.width,
+        _windowExtent.height,
+        1
+    };
+
+    // hardcoding the draw format to 32 bit float
+    _drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    _drawImage.imageExtent = drawImageExtent;
+
+    VkImageUsageFlags drawImageUsages{};
+    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageCreateInfo rimg_info = vkinit::image_create_info(_drawImage.imageFormat, drawImageUsages, drawImageExtent);
+
+    // for the draw image, allocate it from gpu local memory
+    VmaAllocationCreateInfo rimg_allocation = {};
+    rimg_allocation.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    rimg_allocation.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    // allocate and create the image
+    vmaCreateImage(_allocator, &rimg_info, &rimg_allocation, &_drawImage.image, &_drawImage.allocation, nullptr);
+
+    // build a image-view for the draw image to use for rendering
+    VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(_drawImage.imageFormat, _drawImage.image,
+                                                                     VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VK_CHECK(vkCreateImageView(_device, &rview_info, nullptr, &_drawImage.imageView));
+
+    // add to the deletion queues
+    _mainDeletionQueue.push_function([=]()
+    {
+        vkDestroyImageView(_device, _drawImage.imageView, nullptr);
+        vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
+    });
+
     // not implemented yet :3
 }
 
@@ -304,6 +347,20 @@ void VulkanEngine::init_commands()
         VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_frames[i]._mainCommandBuffer));
     }
 }
+
+void VulkanEngine::draw_background(VkCommandBuffer cmd)
+{
+    // make a clear-color from frame number. This will flash with a 120 frame period.
+    VkClearColorValue clearValue;
+    float flash = std::abs(std::sin(_frameNumber / 120.f));
+    clearValue = {{0.0f, 0.0f, flash, 1.0f}};
+
+    VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+
+    // clear image
+    vkCmdClearColorImage(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+}
+
 
 void VulkanEngine::init_sync_structures()
 {

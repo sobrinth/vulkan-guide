@@ -73,6 +73,10 @@ public:
 
     VmaAllocator _allocator;
 
+    // draw resources
+    AllocatedImage _drawImage;
+    VkExtent2D _drawExtent;
+
     static VulkanEngine& Get();
 
     //initializes everything in the engine
@@ -95,4 +99,6 @@ private:
 
     void create_swapchain(uint32_t width, uint32_t height);
     void destroy_swapchain();
+
+    void draw_background(VkCommandBuffer cmd);
 };
