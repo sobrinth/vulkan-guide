@@ -84,6 +84,9 @@ public:
     VkDescriptorSet _drawImageDescriptors;
     VkDescriptorSetLayout _drawImageDescriptorLayout;
 
+    VkPipeline _gradientPipeline;
+    VkPipelineLayout _gradientPipelineLayout;
+
     static VulkanEngine& Get();
 
     //initializes everything in the engine
@@ -109,4 +112,6 @@ private:
 
     void draw_background(VkCommandBuffer cmd);
     void init_descriptors();
+    void init_pipelines();
+    void init_background_pipelines();
 };
