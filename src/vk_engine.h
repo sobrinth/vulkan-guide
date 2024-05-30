@@ -5,6 +5,8 @@
 
 #include <vk_types.h>
 
+#include "vk_descriptors.h"
+
 struct DeletionQueue
 {
     std::deque<std::function<void()>> deletors; // not really efficient for a lot of objects, but ok for this small thing
@@ -77,6 +79,11 @@ public:
     AllocatedImage _drawImage;
     VkExtent2D _drawExtent;
 
+    DescriptorAllocator globalDescriptorAllocator;
+
+    VkDescriptorSet _drawImageDescriptors;
+    VkDescriptorSetLayout _drawImageDescriptorLayout;
+
     static VulkanEngine& Get();
 
     //initializes everything in the engine
@@ -101,4 +108,5 @@ private:
     void destroy_swapchain();
 
     void draw_background(VkCommandBuffer cmd);
+    void init_descriptors();
 };
