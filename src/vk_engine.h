@@ -5,6 +5,8 @@
 
 #include <vk_types.h>
 
+#include <ranges>
+
 #include "vk_descriptors.h"
 
 struct DeletionQueue
@@ -18,9 +20,9 @@ struct DeletionQueue
 
     void flush()
     {
-        for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
+        for (auto& deletor : std::ranges::reverse_view(deletors))
         {
-            (*it)(); // call functors
+            deletor(); // call functors
         }
 
         deletors.clear();
@@ -108,9 +110,9 @@ private:
     void init_sync_structures();
 
     void create_swapchain(uint32_t width, uint32_t height);
-    void destroy_swapchain();
+    void destroy_swapchain() const;
 
-    void draw_background(VkCommandBuffer cmd);
+    void draw_background(VkCommandBuffer cmd) const;
     void init_descriptors();
     void init_pipelines();
     void init_background_pipelines();

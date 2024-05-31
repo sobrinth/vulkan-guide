@@ -16,23 +16,24 @@ bool vkutil::load_shader_module(const char* filePath, VkDevice device, VkShaderM
     // because the cursor is at the end, it gives the size directly in bytes
     size_t fileSize = (size_t)file.tellg();
 
-    // spirv expects the buffer to be on uint32, so make sure to reserve a int vector big enough for the file
+    // spirv expects the buffer to be on uint32, so make sure to reserve an int vector big enough for the file
     std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
 
     //put file cursor at beginning
     file.seekg(0);
 
     // load the entire file into the buffer
-    file.read((char*)buffer.data(), fileSize);
+    file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(fileSize));
 
     file.close();
 
     // create a new shader module
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.pNext = nullptr;
+    VkShaderModuleCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext = nullptr
+    };
 
-    // codeSize has to be in bytes, so multiply the ints in the buffer :)
+    // codeSize has to be in bytes, so multiply the int in the buffer :)
     createInfo.codeSize = buffer.size() * sizeof(uint32_t);
     createInfo.pCode = buffer.data();
 
