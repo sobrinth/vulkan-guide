@@ -89,6 +89,11 @@ public:
     VkPipeline _gradientPipeline;
     VkPipelineLayout _gradientPipelineLayout;
 
+    // immediate submit structures
+    VkFence _immFence;
+    VkCommandBuffer _immCommandBuffer;
+    VkCommandPool _immCommandPool;
+
     static VulkanEngine& Get();
 
     //initializes everything in the engine
@@ -103,6 +108,8 @@ public:
     //run main loop
     void run();
 
+    void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function) const;
+
 private:
     void init_vulkan();
     void init_swapchain();
@@ -116,4 +123,15 @@ private:
     void init_descriptors();
     void init_pipelines();
     void init_background_pipelines();
+
+    void init_imgui();
+    void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) const;
+};
+
+struct ComputePushConstants
+{
+    glm::vec4 data1;
+    glm::vec4 data2;
+    glm::vec4 data3;
+    glm::vec4 data4;
 };
