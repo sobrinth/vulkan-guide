@@ -147,8 +147,24 @@ void VulkanEngine::run()
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
+        if (ImGui::Begin("background"))
+        {
+            ComputeEffect& selected = backgroundEffects[currentBackgroundeffect];
+
+            ImGui::Text("Selected effect: ", selected.name);
+
+            ImGui::SliderInt("Effect Index", &currentBackgroundeffect, 0, backgroundEffects.size() - 1);
+
+            ImGui::InputFloat4("data1", reinterpret_cast<float*>(&selected.data.data1));
+            ImGui::InputFloat4("data2", reinterpret_cast<float*>(&selected.data.data2));
+            ImGui::InputFloat4("data3", reinterpret_cast<float*>(&selected.data.data3));
+            ImGui::InputFloat4("data4", reinterpret_cast<float*>(&selected.data.data4));
+
+            ImGui::End();
+        }
+
         // demo imgui UI
-        ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
 
         // make imgui calculate internal draw structures
         ImGui::Render();
@@ -201,7 +217,7 @@ void VulkanEngine::draw()
     vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent,
                                 _swapchainExtent);
 
-    // set swapchain image layout to Attachement Optimal so we can draw it
+    // set swapchain image layout to Attachment Optimal, so we can draw it
     vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
@@ -401,20 +417,18 @@ void VulkanEngine::init_commands()
     });
 }
 
-void VulkanEngine::draw_background(VkCommandBuffer cmd) const
+void VulkanEngine::draw_background(VkCommandBuffer cmd)
 {
-    // bind the gradient drawing compute pipeline
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipeline);
+    ComputeEffect& effect = backgroundEffects[currentBackgroundeffect];
+
+    // bind the background compute pipeline
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
 
     // bind the descriptor set containing the draw image for the compute pipeline
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors,
                             0, nullptr);
 
-    ComputePushConstants pc;
-    pc.data1 = glm::vec4(1, 0, 0, 1);
-    pc.data2 = glm::vec4(0, 0, 1, 1);
-
-    vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &pc);
+    vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
 
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size, so we need to divide by it
     vkCmdDispatch(cmd, static_cast<int>(std::ceil(_drawExtent.width / 16.0)), static_cast<int>(std::ceil(_drawExtent.height / 16.0)), 1);
@@ -536,8 +550,14 @@ void VulkanEngine::init_pipelines()
 
     VK_CHECK(vkCreatePipelineLayout(_device, &computeLayout, nullptr, &_gradientPipelineLayout));
 
-    VkShaderModule computeDrawShader;
-    if (!vkutil::load_shader_module("../../shaders/gradient_color.comp.spv", _device, &computeDrawShader))
+    VkShaderModule gradientShader;
+    if (!vkutil::load_shader_module("../../shaders/gradient_color.comp.spv", _device, &gradientShader))
+    {
+        fmt::print("Error when building the compute shader \n");
+    }
+
+    VkShaderModule skyShader;
+    if (!vkutil::load_shader_module("../../shaders/gradient_color.comp.spv", _device, &skyShader))
     {
         fmt::print("Error when building the compute shader \n");
     }
@@ -546,7 +566,7 @@ void VulkanEngine::init_pipelines()
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .pNext = nullptr,
         .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-        .module = computeDrawShader,
+        .module = gradientShader,
         .pName = "main"
     };
 
@@ -557,15 +577,45 @@ void VulkanEngine::init_pipelines()
         .layout = _gradientPipelineLayout,
     };
 
-    VK_CHECK(vkCreateComputePipelines(_device,VK_NULL_HANDLE,1,&computePipelineCreateInfo, nullptr, &_gradientPipeline));
-    vkDestroyShaderModule(_device, computeDrawShader, nullptr);
+    ComputeEffect gradient = {
+        .name = "gradient",
+        .layout = _gradientPipelineLayout,
+        .data = {}
+    };
 
-    _mainDeletionQueue.push_function([&]()
+    // default colors
+    gradient.data.data1 = glm::vec4(1, 0, 0, 1);
+    gradient.data.data2 = glm::vec4(0, 0, 1, 1);
+
+    VK_CHECK(vkCreateComputePipelines(_device,VK_NULL_HANDLE,1,&computePipelineCreateInfo, nullptr, &gradient.pipeline));
+
+    // change the shader module only to create the sky shader
+    computePipelineCreateInfo.stage.module = skyShader;
+
+    ComputeEffect sky = {
+        .name = "sky",
+        .layout = _gradientPipelineLayout,
+        .data = {}
+    };
+
+    // default sky parameters
+    sky.data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
+
+    VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &sky.pipeline));
+
+    // add the 2 background effects into the array
+    backgroundEffects.push_back(gradient);
+    backgroundEffects.push_back(sky);
+
+    vkDestroyShaderModule(_device, gradientShader, nullptr);
+    vkDestroyShaderModule(_device, skyShader, nullptr);
+
+    _mainDeletionQueue.push_function([this, sky, gradient]()
     {
         vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
-        vkDestroyPipeline(_device, _gradientPipeline, nullptr);
+        vkDestroyPipeline(_device, sky.pipeline, nullptr);
+        vkDestroyPipeline(_device, gradient.pipeline, nullptr);
     });
-
 }
 
 void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function) const
@@ -644,17 +694,17 @@ void VulkanEngine::init_imgui()
         .UseDynamicRendering = true
     };
 
-	//dynamic rendering parameters for imgui to use
-	init_info.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-	init_info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &_swapchainImageFormat;
+    //dynamic rendering parameters for imgui to use
+    init_info.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+    init_info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &_swapchainImageFormat;
 
     ImGui_ImplVulkan_Init(&init_info);
 
     ImGui_ImplVulkan_CreateFontsTexture();
 
     // add destruction of imgui structures
-    _mainDeletionQueue.push_function([=]()
+    _mainDeletionQueue.push_function([this, imguiPool]()
     {
         ImGui_ImplVulkan_Shutdown();
         vkDestroyDescriptorPool(_device, imguiPool, nullptr);
