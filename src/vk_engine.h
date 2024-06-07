@@ -9,6 +9,7 @@
 #include <ranges>
 
 #include "vk_descriptors.h"
+#include "vk_loader.h"
 
 struct DeletionQueue
 {
@@ -77,6 +78,7 @@ public:
 
     //run main loop
     void run();
+    GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
 private:
     bool _isInitialized{false};
@@ -138,6 +140,8 @@ private:
 
     GPUMeshBuffers rectangle;
 
+    std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+
     //draw loop
     void draw();
 
@@ -163,7 +167,6 @@ private:
 
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) const;
     void destroy_buffer(const AllocatedBuffer& buffer) const;
-    GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
     void init_mesh_pipeline();
     void init_default_data();
