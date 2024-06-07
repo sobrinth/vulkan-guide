@@ -90,7 +90,9 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device)
     };
 
     // completely clear VertexInputStateCreateInfo, as we have no need for it
-    VkPipelineVertexInputStateCreateInfo _vertexInputInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+    VkPipelineVertexInputStateCreateInfo _vertexInputInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+    };
 
     // build the actual pipeline
     // we now use all the info structs we have been writing into this one to create the pipeline
@@ -174,7 +176,8 @@ void PipelineBuilder::set_multisampling_none()
 void PipelineBuilder::disable_blending()
 {
     // default write mask
-    _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     // no blending
     _colorBlendAttachment.blendEnable = VK_FALSE;
 }
@@ -197,6 +200,19 @@ void PipelineBuilder::disable_depthtest()
     _depthStencil.depthTestEnable = VK_FALSE;
     _depthStencil.depthWriteEnable = VK_FALSE;
     _depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
+    _depthStencil.depthBoundsTestEnable = VK_FALSE;
+    _depthStencil.stencilTestEnable = VK_FALSE;
+    _depthStencil.front = {};
+    _depthStencil.back = {};
+    _depthStencil.minDepthBounds = 0.f;
+    _depthStencil.maxDepthBounds = 1.f;
+}
+
+void PipelineBuilder::enable_depthtest(bool depthWriteEnable, VkCompareOp op)
+{
+    _depthStencil.depthTestEnable = VK_TRUE;
+    _depthStencil.depthWriteEnable = depthWriteEnable;
+    _depthStencil.depthCompareOp = op;
     _depthStencil.depthBoundsTestEnable = VK_FALSE;
     _depthStencil.stencilTestEnable = VK_FALSE;
     _depthStencil.front = {};
