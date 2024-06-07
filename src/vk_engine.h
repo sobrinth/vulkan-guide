@@ -133,6 +133,11 @@ private:
     VkPipelineLayout _trianglePipelineLayout;
     VkPipeline _trianglePipeline;
 
+    VkPipelineLayout _meshPipelineLayout;
+    VkPipeline _meshPipeline;
+
+    GPUMeshBuffers rectangle;
+
     //draw loop
     void draw();
 
@@ -147,6 +152,7 @@ private:
 
     void draw_background(VkCommandBuffer cmd);
     void init_descriptors();
+    bool init_background_pipelines();
     void init_pipelines();
 
     void init_imgui();
@@ -154,4 +160,11 @@ private:
 
     void init_triangle_pipeline();
     void draw_geometry(VkCommandBuffer cmd) const;
+
+    AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) const;
+    void destroy_buffer(const AllocatedBuffer& buffer) const;
+    GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
+    void init_mesh_pipeline();
+    void init_default_data();
 };
