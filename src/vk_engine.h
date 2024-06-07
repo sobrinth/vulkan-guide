@@ -133,13 +133,8 @@ private:
     std::vector<ComputeEffect> backgroundEffects;
     int currentBackgroundeffect{0};
 
-    VkPipelineLayout _trianglePipelineLayout;
-    VkPipeline _trianglePipeline;
-
     VkPipelineLayout _meshPipelineLayout;
     VkPipeline _meshPipeline;
-
-    GPUMeshBuffers rectangle;
 
     std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
@@ -163,7 +158,6 @@ private:
     void init_imgui();
     void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) const;
 
-    void init_triangle_pipeline();
     void draw_geometry(VkCommandBuffer cmd) const;
 
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) const;
