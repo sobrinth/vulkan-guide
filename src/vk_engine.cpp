@@ -161,9 +161,8 @@ void VulkanEngine::run()
             ImGui::InputFloat4("data2", reinterpret_cast<float*>(&selected.data.data2));
             ImGui::InputFloat4("data3", reinterpret_cast<float*>(&selected.data.data3));
             ImGui::InputFloat4("data4", reinterpret_cast<float*>(&selected.data.data4));
-
-            ImGui::End();
         }
+        ImGui::End();
 
         // demo imgui UI
         // ImGui::ShowDemoWindow();
