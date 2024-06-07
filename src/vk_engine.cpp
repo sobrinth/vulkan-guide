@@ -1037,4 +1037,10 @@ void VulkanEngine::init_default_data()
     rect_indices[5] = 3;
 
     rectangle = upload_mesh(rect_indices, rect_vertices);
+
+    _mainDeletionQueue.push_function([=]()
+    {
+        destroy_buffer(rectangle.indexBuffer);
+        destroy_buffer(rectangle.vertexBuffer);
+    });
 }
