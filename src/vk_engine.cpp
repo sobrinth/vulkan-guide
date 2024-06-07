@@ -106,6 +106,7 @@ void VulkanEngine::cleanup()
 
 void VulkanEngine::run()
 {
+    assert(loadedEngine != nullptr);
     SDL_Event e;
     bool bQuit = false;
 
@@ -187,13 +188,13 @@ void VulkanEngine::draw()
         vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._swapchainSemaphore, nullptr, &
             swapchainImageIndex));
 
-    VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
+    auto cmd = get_current_frame()._mainCommandBuffer;
 
     // now that we are sure that the commands finished executing, we can safely reset the buffer
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
     // begin the command buffer recording. We will use the buffer exactly once, so we tell vulkan
-    VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(
+    auto cmdBeginInfo = vkinit::command_buffer_begin_info(
         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     _drawExtent.width = _drawImage.imageExtent.width;
@@ -239,14 +240,14 @@ void VulkanEngine::draw()
     // prepare the submission to the queue.
     // we want to wait on the _presentSemaphore, as that semaphore is signaled when the swapchain is ready
     // we will signal the _renderSemaphore, to signal that rendering has finished
-    VkCommandBufferSubmitInfo cmdInfo = vkinit::command_buffer_submit_info(cmd);
+    auto cmdInfo = vkinit::command_buffer_submit_info(cmd);
 
-    VkSemaphoreSubmitInfo waitInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
-                                                                   get_current_frame()._swapchainSemaphore);
-    VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-                                                                     get_current_frame()._renderSemaphore);
+    auto waitInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
+                                                  get_current_frame()._swapchainSemaphore);
+    auto signalInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+                                                    get_current_frame()._renderSemaphore);
 
-    VkSubmitInfo2 submit = vkinit::submit_info(&cmdInfo, &signalInfo, &waitInfo);
+    auto submit = vkinit::submit_info(&cmdInfo, &signalInfo, &waitInfo);
 
     // submit command buffer to the queue and execute it.
     // _renderFence will now block until the graphic commands finish execution.
@@ -395,7 +396,7 @@ void VulkanEngine::init_commands()
 {
     // create a command pool for commands submitted to the graphics queue.
     // we also want the pool to allow for resetting of individual command buffers.
-    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
+    auto commandPoolInfo = vkinit::command_pool_create_info(
         _graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     for (auto& frame : _frames)
@@ -403,7 +404,7 @@ void VulkanEngine::init_commands()
         VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &frame._commandPool));
 
         // allocate the default command buffer that we will use for rendering
-        VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(frame._commandPool, 1);
+        auto cmdAllocInfo = vkinit::command_buffer_allocate_info(frame._commandPool, 1);
 
         VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &frame._mainCommandBuffer));
     }
@@ -411,7 +412,7 @@ void VulkanEngine::init_commands()
     VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_immCommandPool));
 
     // allocate the command buffer for immediate submits
-    VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_immCommandPool, 1);
+    auto cmdAllocInfo = vkinit::command_buffer_allocate_info(_immCommandPool, 1);
 
     VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_immCommandBuffer));
 
@@ -445,8 +446,8 @@ void VulkanEngine::init_sync_structures()
     // one fence to control when the gpu has finished rendering the frame
     // and 2 semaphores to synchronize rendering with swapchain
     // we want the fence to start signalled, so we can wait on it on the first frame
-    VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
-    VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
+    auto fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+    auto semaphoreCreateInfo = vkinit::semaphore_create_info();
 
     for (auto& frame : _frames)
     {
@@ -631,7 +632,7 @@ void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& f
 
     VkCommandBuffer cmd = _immCommandBuffer;
 
-    VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    auto cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
@@ -639,8 +640,8 @@ void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& f
 
     VK_CHECK(vkEndCommandBuffer(cmd));
 
-    VkCommandBufferSubmitInfo cmdInfo = vkinit::command_buffer_submit_info(cmd);
-    VkSubmitInfo2 submit = vkinit::submit_info(&cmdInfo, nullptr, nullptr);
+    auto cmdInfo = vkinit::command_buffer_submit_info(cmd);
+    auto submit = vkinit::submit_info(&cmdInfo, nullptr, nullptr);
 
     // submit command buffer to the queue and execute it.
     // _renderFence will now block until the graphic commands finish execution
@@ -719,8 +720,8 @@ void VulkanEngine::init_imgui()
 
 void VulkanEngine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) const
 {
-    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingInfo renderInfo = vkinit::rendering_info(_swapchainExtent, &colorAttachment, nullptr);
+    auto colorAttachment = vkinit::attachment_info(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    auto renderInfo = vkinit::rendering_info(_swapchainExtent, &colorAttachment, nullptr);
 
     vkCmdBeginRendering(cmd, &renderInfo);
 
@@ -753,7 +754,7 @@ void VulkanEngine::init_triangle_pipeline()
 
     // build the pipeline layout that controls the inputs/outputs of the shader
     // we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipeline_layout_create_info();
+    auto pipelineLayoutInfo = vkinit::pipeline_layout_create_info();
     VK_CHECK(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_trianglePipelineLayout));
 
     // Creating the graphics pipeline
@@ -794,10 +795,10 @@ void VulkanEngine::init_triangle_pipeline()
     });
 }
 
-void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
+void VulkanEngine::draw_geometry(VkCommandBuffer cmd) const
 {
     // begin a render pass, connected to our draw image
-    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+    auto colorAttachment = vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
 
     VkRenderingInfo renderInfo = vkinit::rendering_info(_drawExtent, &colorAttachment, nullptr);
     vkCmdBeginRendering(cmd, &renderInfo);

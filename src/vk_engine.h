@@ -1,6 +1,7 @@
 ﻿// vulkan_guide.h : Include file for standard system include files,
 // or project specific include files.
 
+// ReSharper disable CppUninitializedNonStaticDataMember
 #pragma once
 
 #include <vk_types.h>
@@ -11,7 +12,8 @@
 
 struct DeletionQueue
 {
-    std::deque<std::function<void()>> deletors; // not really efficient for a lot of objects, but ok for this small thing
+    std::deque<std::function<void()>> deletors;
+    // not really efficient for a lot of objects, but ok for this small thing
 
     void push_function(std::function<void()>&& function)
     {
@@ -63,6 +65,20 @@ constexpr unsigned int FRAME_OVERLAP = 2;
 class VulkanEngine
 {
 public:
+    VulkanEngine() = default;
+
+    static VulkanEngine& Get();
+
+    //initializes everything in the engine
+    void init();
+
+    //shuts down the engine
+    void cleanup();
+
+    //run main loop
+    void run();
+
+private:
     bool _isInitialized{false};
     int _frameNumber{0};
     bool stop_rendering{false};
@@ -117,23 +133,10 @@ public:
     VkPipelineLayout _trianglePipelineLayout;
     VkPipeline _trianglePipeline;
 
-    static VulkanEngine& Get();
-
-    //initializes everything in the engine
-    void init();
-
-    //shuts down the engine
-    void cleanup();
-
     //draw loop
     void draw();
 
-    //run main loop
-    void run();
-
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function) const;
-
-private:
     void init_vulkan();
     void init_swapchain();
     void init_commands();
@@ -150,5 +153,5 @@ private:
     void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) const;
 
     void init_triangle_pipeline();
-    void draw_geometry(VkCommandBuffer cmd);
+    void draw_geometry(VkCommandBuffer cmd) const;
 };
