@@ -8,3 +8,4 @@ CMakeCache.txt
 /third_party/fmt/fmt.pc
 /third_party/fmt/fmt-config.cmake
 /third_party/fmt/fmt-config-version.cmake
+/shaders/*.spv
