@@ -18,7 +18,7 @@ struct DeletionQueue
 
     void push_function(std::function<void()>&& function)
     {
-        deletors.push_back(function);
+        deletors.push_back(std::move(function));
     }
 
     void flush()
@@ -34,13 +34,13 @@ struct DeletionQueue
 
 struct FrameData
 {
-    VkSemaphore _swapchainSemaphore, _renderSemaphore;
-    VkFence _renderFence;
+    VkSemaphore swapchain_semaphore, renderSemaphore;
+    VkFence renderFence;
 
-    VkCommandPool _commandPool;
-    VkCommandBuffer _mainCommandBuffer;
+    VkCommandPool commandPool;
+    VkCommandBuffer mainCommandBuffer;
 
-    DeletionQueue _deletionQueue;
+    DeletionQueue deletionQueue;
 };
 
 struct ComputePushConstants
@@ -78,19 +78,19 @@ public:
 
     //run main loop
     void run();
-    GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+    [[nodiscard]] GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) const;
 
 private:
     bool _isInitialized{false};
     int _frameNumber{0};
-    bool stop_rendering{false};
+    bool _stopRendering{false};
     VkExtent2D _windowExtent{1700, 900};
 
     struct SDL_Window* _window{nullptr};
 
     VkInstance _instance; // Vulkan library handle
-    VkDebugUtilsMessengerEXT _debug_messenger; // Vulkan debug output handle
-    VkPhysicalDevice _chosenGPU; // GPU chosen as the default device
+    VkDebugUtilsMessengerEXT _debugMessenger; // Vulkan debug output handle
+    VkPhysicalDevice _chosenGpu; // GPU chosen as the default device
     VkDevice _device; // Vulkan device for commands
     VkSurfaceKHR _surface; // Vulkan window surface
 
@@ -118,7 +118,7 @@ private:
     AllocatedImage _depthImage;
     VkExtent2D _drawExtent;
 
-    DescriptorAllocator globalDescriptorAllocator;
+    DescriptorAllocator _globalDescriptorAllocator;
 
     VkDescriptorSet _drawImageDescriptors;
     VkDescriptorSetLayout _drawImageDescriptorLayout;
@@ -130,13 +130,13 @@ private:
     VkCommandBuffer _immCommandBuffer;
     VkCommandPool _immCommandPool;
 
-    std::vector<ComputeEffect> backgroundEffects;
-    int currentBackgroundeffect{0};
+    std::vector<ComputeEffect> _backgroundEffects;
+    int _activeBackgroundEffect{0};
 
     VkPipelineLayout _meshPipelineLayout;
     VkPipeline _meshPipeline;
 
-    std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+    std::vector<std::shared_ptr<MeshAsset>> _testMeshes;
 
     //draw loop
     void draw();
@@ -160,7 +160,7 @@ private:
 
     void draw_geometry(VkCommandBuffer cmd) const;
 
-    AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) const;
+    [[nodiscard]] AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) const;
     void destroy_buffer(const AllocatedBuffer& buffer) const;
 
     void init_mesh_pipeline();

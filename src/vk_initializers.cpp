@@ -16,7 +16,7 @@ VkCommandPoolCreateInfo vkinit::command_pool_create_info(uint32_t queueFamilyInd
 VkCommandBufferAllocateInfo vkinit::command_buffer_allocate_info(
     VkCommandPool pool, uint32_t count /*= 1*/)
 {
-    VkCommandBufferAllocateInfo info = {};
+    VkCommandBufferAllocateInfo info;
     info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     info.pNext = nullptr;
 
@@ -26,11 +26,11 @@ VkCommandBufferAllocateInfo vkinit::command_buffer_allocate_info(
     return info;
 }
 //< init_cmd
-// 
+//
 //> init_cmd_draw
 VkCommandBufferBeginInfo vkinit::command_buffer_begin_info(VkCommandBufferUsageFlags flags /*= 0*/)
 {
-    VkCommandBufferBeginInfo info = {};
+    VkCommandBufferBeginInfo info;
     info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     info.pNext = nullptr;
 
@@ -43,7 +43,7 @@ VkCommandBufferBeginInfo vkinit::command_buffer_begin_info(VkCommandBufferUsageF
 //> init_sync
 VkFenceCreateInfo vkinit::fence_create_info(VkFenceCreateFlags flags /*= 0*/)
 {
-    VkFenceCreateInfo info = {};
+    VkFenceCreateInfo info;
     info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     info.pNext = nullptr;
 
@@ -54,7 +54,7 @@ VkFenceCreateInfo vkinit::fence_create_info(VkFenceCreateFlags flags /*= 0*/)
 
 VkSemaphoreCreateInfo vkinit::semaphore_create_info(VkSemaphoreCreateFlags flags /*= 0*/)
 {
-    VkSemaphoreCreateInfo info = {};
+    VkSemaphoreCreateInfo info;
     info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     info.pNext = nullptr;
     info.flags = flags;
@@ -65,7 +65,7 @@ VkSemaphoreCreateInfo vkinit::semaphore_create_info(VkSemaphoreCreateFlags flags
 //> init_submit
 VkSemaphoreSubmitInfo vkinit::semaphore_submit_info(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore)
 {
-	VkSemaphoreSubmitInfo submitInfo{};
+	VkSemaphoreSubmitInfo submitInfo;
 	submitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
 	submitInfo.pNext = nullptr;
 	submitInfo.semaphore = semaphore;
@@ -78,7 +78,7 @@ VkSemaphoreSubmitInfo vkinit::semaphore_submit_info(VkPipelineStageFlags2 stageM
 
 VkCommandBufferSubmitInfo vkinit::command_buffer_submit_info(VkCommandBuffer cmd)
 {
-	VkCommandBufferSubmitInfo info{};
+	VkCommandBufferSubmitInfo info;
 	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
 	info.pNext = nullptr;
 	info.commandBuffer = cmd;
@@ -179,7 +179,7 @@ VkRenderingInfo vkinit::rendering_info(VkExtent2D renderExtent, VkRenderingAttac
 //> subresource
 VkImageSubresourceRange vkinit::image_subresource_range(VkImageAspectFlags aspectMask)
 {
-    VkImageSubresourceRange subImage {};
+    VkImageSubresourceRange subImage;
     subImage.aspectMask = aspectMask;
     subImage.baseMipLevel = 0;
     subImage.levelCount = VK_REMAINING_MIP_LEVELS;
@@ -195,7 +195,7 @@ VkImageSubresourceRange vkinit::image_subresource_range(VkImageAspectFlags aspec
 VkDescriptorSetLayoutBinding vkinit::descriptorset_layout_binding(VkDescriptorType type, VkShaderStageFlags stageFlags,
     uint32_t binding)
 {
-    VkDescriptorSetLayoutBinding setbind = {};
+    VkDescriptorSetLayoutBinding setbind;
     setbind.binding = binding;
     setbind.descriptorCount = 1;
     setbind.descriptorType = type;
@@ -208,7 +208,7 @@ VkDescriptorSetLayoutBinding vkinit::descriptorset_layout_binding(VkDescriptorTy
 VkDescriptorSetLayoutCreateInfo vkinit::descriptorset_layout_create_info(VkDescriptorSetLayoutBinding* bindings,
     uint32_t bindingCount)
 {
-    VkDescriptorSetLayoutCreateInfo info = {};
+    VkDescriptorSetLayoutCreateInfo info;
     info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     info.pNext = nullptr;
 
@@ -253,7 +253,7 @@ VkWriteDescriptorSet vkinit::write_descriptor_buffer(VkDescriptorType type, VkDe
 
 VkDescriptorBufferInfo vkinit::buffer_info(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range)
 {
-    VkDescriptorBufferInfo binfo {};
+    VkDescriptorBufferInfo binfo;
     binfo.buffer = buffer;
     binfo.offset = offset;
     binfo.range = range;
@@ -306,7 +306,7 @@ VkImageViewCreateInfo vkinit::imageview_create_info(VkFormat format, VkImage ima
 //< image_set
 VkPipelineLayoutCreateInfo vkinit::pipeline_layout_create_info()
 {
-    VkPipelineLayoutCreateInfo info {};
+    VkPipelineLayoutCreateInfo info;
     info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     info.pNext = nullptr;
 

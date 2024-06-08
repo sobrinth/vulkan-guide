@@ -14,7 +14,7 @@ bool vkutil::load_shader_module(const char* filePath, VkDevice device, VkShaderM
 
     // find what the size of the file is by looking up the location of the cursor
     // because the cursor is at the end, it gives the size directly in bytes
-    size_t fileSize = (size_t)file.tellg();
+    size_t fileSize = file.tellg();
 
     // spirv expects the buffer to be on uint32, so make sure to reserve an int vector big enough for the file
     std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
