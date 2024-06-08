@@ -88,27 +88,24 @@ void VulkanEngine::cleanup()
         vkDeviceWaitIdle(_device);
 
         _globalDescriptorAllocator.destroy_pool(_device);
-        vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
-        vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
 
         for (auto& [_swapchainSemaphore, _renderSemaphore, _renderFence, _commandPool, _, _deletionQueue, frameDescriptors] : _frames)
         {
-            _deletionQueue.flush();
-
             vkDestroyCommandPool(_device, _commandPool, nullptr);
 
             // destroy sync objects
             vkDestroyFence(_device, _renderFence, nullptr);
             vkDestroySemaphore(_device, _renderSemaphore, nullptr);
             vkDestroySemaphore(_device, _swapchainSemaphore, nullptr);
+            _deletionQueue.flush();
         }
-
         _mainDeletionQueue.flush();
+
         destroy_swapchain();
 
         vkDestroySurfaceKHR(_instance, _surface, nullptr);
-        vkDestroyDevice(_device, nullptr);
 
+        vkDestroyDevice(_device, nullptr);
         vkb::destroy_debug_utils_messenger(_instance, _debugMessenger);
         vkDestroyInstance(_instance, nullptr);
 
@@ -600,6 +597,8 @@ void VulkanEngine::init_descriptors()
     _mainDeletionQueue.push_function([&]
     {
         // TODO: Move the other DSL here from cleanup()
+        vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
+        vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
         vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
     });
 
@@ -1019,7 +1018,6 @@ AllocatedImage VulkanEngine::create_image(const VkExtent3D size, const VkFormat 
     };
 
     // allocate and create the image
-    // TODO: VALIDATE DESTRUCTION
     VK_CHECK(vmaCreateImage(_allocator, &img_info, &allocInfo, &image.image, &image.allocation, nullptr));
 
     // if the format is a depth format, we will need to have it use the correct aspect flags
