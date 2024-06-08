@@ -41,6 +41,7 @@ struct FrameData
     VkCommandBuffer mainCommandBuffer;
 
     DeletionQueue deletionQueue;
+    GrowableDescriptorAllocator frameDescriptors;
 };
 
 struct ComputePushConstants
@@ -122,6 +123,9 @@ private:
 
     DescriptorAllocator _globalDescriptorAllocator;
 
+    GPUSceneData _sceneData;
+    VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+
     VkDescriptorSet _drawImageDescriptors;
     VkDescriptorSetLayout _drawImageDescriptorLayout;
 
@@ -161,7 +165,7 @@ private:
     void init_imgui();
     void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) const;
 
-    void draw_geometry(VkCommandBuffer cmd) const;
+    void draw_geometry(VkCommandBuffer cmd);
 
     [[nodiscard]] AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) const;
     void destroy_buffer(const AllocatedBuffer& buffer) const;
