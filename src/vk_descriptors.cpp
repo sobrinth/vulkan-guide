@@ -1,6 +1,6 @@
 ﻿#include <vk_descriptors.h>
 
-void DescriptorLayoutBuilder::add_binding(uint32_t binding, VkDescriptorType type)
+void DescriptorLayoutBuilder::add_binding(const uint32_t binding, const VkDescriptorType type)
 {
     const VkDescriptorSetLayoutBinding newbind = {
         .binding = binding,
@@ -16,8 +16,8 @@ void DescriptorLayoutBuilder::clear()
     bindings.clear();
 }
 
-VkDescriptorSetLayout DescriptorLayoutBuilder::build(VkDevice device, VkShaderStageFlags shaderStages, void* pNext,
-                                                     VkDescriptorSetLayoutCreateFlags flags)
+VkDescriptorSetLayout DescriptorLayoutBuilder::build(const VkDevice device, const VkShaderStageFlags shaderStages, void* pNext,
+                                                     const VkDescriptorSetLayoutCreateFlags flags)
 {
     for (auto& b : bindings)
     {
@@ -37,7 +37,7 @@ VkDescriptorSetLayout DescriptorLayoutBuilder::build(VkDevice device, VkShaderSt
     return set;
 }
 
-void DescriptorAllocator::init_pool(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios)
+void DescriptorAllocator::init_pool(const VkDevice device, const uint32_t maxSets, const std::span<PoolSizeRatio> poolRatios)
 {
     std::vector<VkDescriptorPoolSize> poolSizes;
     for (PoolSizeRatio ratio : poolRatios)
@@ -58,18 +58,18 @@ void DescriptorAllocator::init_pool(VkDevice device, uint32_t maxSets, std::span
     vkCreateDescriptorPool(device, &pool_info, nullptr, &pool);
 }
 
-void DescriptorAllocator::clear_descriptors(VkDevice device) const
+void DescriptorAllocator::clear_descriptors(const VkDevice device) const
 {
     vkResetDescriptorPool(device, pool, 0);
 }
 
-void DescriptorAllocator::destroy_pool(VkDevice device) const
+void DescriptorAllocator::destroy_pool(const VkDevice device) const
 {
     vkDestroyDescriptorPool(device, pool, nullptr);
 }
 
 
-VkDescriptorSet DescriptorAllocator::allocate(VkDevice device, VkDescriptorSetLayout layout) const
+VkDescriptorSet DescriptorAllocator::allocate(const VkDevice device, VkDescriptorSetLayout layout) const
 {
     VkDescriptorSetAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -203,4 +203,58 @@ VkDescriptorPool GrowableDescriptorAllocator::create_pool(const VkDevice device,
     VkDescriptorPool pool;
     vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool);
     return pool;
+}
+
+void DescriptorWriter::write_image(const int binding, const VkImageView image, const VkSampler sampler, const VkImageLayout layout,
+                                   const VkDescriptorType type)
+{
+    auto& info = imageInfos.emplace_back(VkDescriptorImageInfo{.sampler = sampler, .imageView = image, .imageLayout = layout});
+
+    const VkWriteDescriptorSet write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = nullptr,
+        .dstSet = VK_NULL_HANDLE,
+        .dstBinding = static_cast<uint32_t>(binding),
+        .descriptorCount = 1,
+        .descriptorType = type,
+        .pImageInfo = &info,
+    };
+    writes.push_back(write);
+}
+
+void DescriptorWriter::write_buffer(const int binding, const VkBuffer buffer, const size_t size, const size_t offset, const VkDescriptorType type)
+{
+    auto& info = bufferInfos.emplace_back(VkDescriptorBufferInfo{
+        .buffer = buffer,
+        .offset = offset,
+        .range = size
+    });
+
+    const VkWriteDescriptorSet write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = VK_NULL_HANDLE, // left empty for now until we need to write it
+        .dstBinding = static_cast<uint32_t>(binding),
+        .descriptorCount = 1,
+        .descriptorType = type,
+        .pBufferInfo = &info,
+    };
+
+    writes.push_back(write);
+}
+
+void DescriptorWriter::clear()
+{
+    imageInfos.clear();
+    bufferInfos.clear();
+    writes.clear();
+}
+
+void DescriptorWriter::update_set(const VkDevice device, const VkDescriptorSet set)
+{
+    for (auto& write : writes)
+    {
+        write.dstSet = set;
+    }
+
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 }
