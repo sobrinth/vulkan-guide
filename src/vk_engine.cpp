@@ -871,6 +871,26 @@ void VulkanEngine::draw_geometry(const VkCommandBuffer cmd)
     // begin clock
     auto start = std::chrono::system_clock::now();
 
+    std::vector<uint32_t> opaque_draws;
+    opaque_draws.reserve(mainDrawContext.opaqueSurfaces.size());
+
+    for (uint32_t i = 0; i < mainDrawContext.opaqueSurfaces.size(); i++)
+    {
+        opaque_draws.push_back(i);
+    }
+
+    // sort the opaque surfaces by material and mesh
+    std::sort(opaque_draws.begin(), opaque_draws.end(), [&](const auto& iA, const auto& iB)
+    {
+        const RenderObject& A = mainDrawContext.opaqueSurfaces[iA];
+        const RenderObject& B = mainDrawContext.opaqueSurfaces[iB];
+        if (A.material == B.material)
+        {
+            return A.indexBuffer < B.indexBuffer;
+        }
+        return A.material < B.material;
+    });
+
     // begin a render pass, connected to our draw image
     auto colorAttachment = vkinit::attachment_info(_drawImage.imageView, nullptr,
                                                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -963,9 +983,9 @@ void VulkanEngine::draw_geometry(const VkCommandBuffer cmd)
         engineStats.triangle_count += r.indexCount / 3;
     };
 
-    for (auto& r : mainDrawContext.opaqueSurfaces)
+    for (auto& r : opaque_draws)
     {
-        draw(r);
+        draw(mainDrawContext.opaqueSurfaces[r]);
     }
 
     for (auto& r : mainDrawContext.transparentSurfaces)
