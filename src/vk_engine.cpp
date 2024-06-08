@@ -980,6 +980,86 @@ GPUMeshBuffers VulkanEngine::upload_mesh(const std::span<uint32_t> indices, cons
     return newSurface;
 }
 
+AllocatedImage VulkanEngine::create_image(const VkExtent3D size, const VkFormat format, const VkImageUsageFlags usage, const bool mipmapped) const
+{
+    AllocatedImage image;
+    image.imageFormat = format;
+    image.imageExtent = size;
+
+    auto img_info = vkinit::image_create_info(format, usage, size);
+    if (mipmapped)
+    {
+        img_info.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(size.width, size.height)))) + 1;
+    }
+
+    // always allocate images on dedicated GPU memory
+    constexpr VmaAllocationCreateInfo allocInfo = {
+        .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .requiredFlags = static_cast<VkMemoryPropertyFlags>(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+    };
+
+    // allocate and create the image
+    // TODO: VALIDATE DESTRUCTION
+    VK_CHECK(vmaCreateImage(_allocator, &img_info, &allocInfo, &image.image, &image.allocation, nullptr));
+
+    // if the format is a depth format, we will need to have it use the correct aspect flags
+    VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
+    if (format == VK_FORMAT_D32_SFLOAT)
+    {
+        aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+
+    // build a image-view for the image
+    VkImageViewCreateInfo view_info = vkinit::imageview_create_info(format, image.image, aspectFlag);
+    view_info.subresourceRange.levelCount = img_info.mipLevels;
+
+    VK_CHECK(vkCreateImageView(_device, &view_info, nullptr, &image.imageView));
+
+    return image;
+}
+
+AllocatedImage VulkanEngine::create_image(const void* data, const VkExtent3D size, const VkFormat format, const VkImageUsageFlags usage,
+                                          const bool mipmapped) const
+{
+    const size_t data_size = size.depth * size.width * size.height * 4;
+    const auto uploadBuffer = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    memcpy(uploadBuffer.info.pMappedData, data, data_size);
+    const auto image = create_image(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
+
+    immediate_submit([&](const VkCommandBuffer cmd)
+    {
+        vkutil::transition_image(cmd, image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        VkBufferImageCopy copyRegion = {
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = 0,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            },
+            .imageExtent = size
+        };
+
+        // copy the buffer into the image
+        vkCmdCopyBufferToImage(cmd, uploadBuffer.buffer, image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+        vkutil::transition_image(cmd, image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
+
+    destroy_buffer(uploadBuffer);
+    return image;
+}
+
+void VulkanEngine::destroy_image(const AllocatedImage& img) const
+{
+    vkDestroyImageView(_device, img.imageView, nullptr);
+    vmaDestroyImage(_allocator, img.image, img.allocation);
+}
+
 void VulkanEngine::init_mesh_pipeline()
 {
     VkShaderModule meshFragShader;

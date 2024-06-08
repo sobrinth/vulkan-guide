@@ -81,6 +81,10 @@ public:
     void run();
     [[nodiscard]] GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) const;
 
+    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false) const;
+    AllocatedImage create_image(const void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false) const;
+    void destroy_image(const AllocatedImage& img) const;
+
 private:
     bool _isInitialized{false};
     int _frameNumber{0};
