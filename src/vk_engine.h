@@ -76,6 +76,40 @@ struct RenderObject
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
+struct GLTFMetallic_Roughness
+{
+    MaterialPipeline opaquePipeline;
+    MaterialPipeline transparentPipeline;
+
+    VkDescriptorSetLayout materialLayout;
+
+    struct MaterialConstants
+    {
+        glm::vec4 colorFactors;
+        glm::vec4 metal_rough_factors;
+        // padding, we need it anyway for uniform buffers
+        glm::vec4 extra[14];
+    };
+
+    struct MaterialResources
+    {
+        AllocatedImage colorImage;
+        VkSampler colorSampler;
+        AllocatedImage metalRoughImage;
+        VkSampler metalRoughSampler;
+        VkBuffer dataBuffer;
+        uint32_t dataBufferOffset;
+    };
+
+    DescriptorWriter writer;
+
+    void build_pipelines(VulkanEngine* engine);
+    void clear_resources(VkDevice device) const;
+
+    MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources,
+                                    GrowableDescriptorAllocator& descriptorAllocator);
+};
+
 class VulkanEngine
 {
 public:
@@ -83,6 +117,14 @@ public:
 
     VkDevice device; // Vulkan device for commands
     static VulkanEngine& Get();
+
+    VkDevice GetDevice() { return device; }
+    VkDescriptorSetLayout GetSceneDescriptorLayout() { return _gpuSceneDataDescriptorLayout; }
+    AllocatedImage GetDrawImage() { return _drawImage; }
+    AllocatedImage GetDepthImage() { return _depthImage; }
+
+    MaterialInstance defaultData;
+    GLTFMetallic_Roughness metalRoughMaterial;
 
     //initializes everything in the engine
     void init();
@@ -137,7 +179,7 @@ private:
     VkExtent2D _drawExtent;
     float _renderScale = 1.f;
 
-    DescriptorAllocator _globalDescriptorAllocator;
+    GrowableDescriptorAllocator _globalDescriptorAllocator;
 
     GPUSceneData _sceneData;
     VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;

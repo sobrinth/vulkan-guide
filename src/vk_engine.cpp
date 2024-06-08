@@ -87,7 +87,7 @@ void VulkanEngine::cleanup()
         // make sure the gpu has stopped doing its tings
         vkDeviceWaitIdle(device);
 
-        _globalDescriptorAllocator.destroy_pool(device);
+        metalRoughMaterial.clear_resources(device);
 
         for (auto& [_swapchainSemaphore, _renderSemaphore, _renderFence, _commandPool, _, _deletionQueue, frameDescriptors] : _frames)
         {
@@ -100,6 +100,7 @@ void VulkanEngine::cleanup()
             _deletionQueue.flush();
         }
         _mainDeletionQueue.flush();
+        _globalDescriptorAllocator.destroy_pools(device);
 
         destroy_swapchain();
 
@@ -563,11 +564,12 @@ void VulkanEngine::destroy_swapchain() const
 void VulkanEngine::init_descriptors()
 {
     // create a descriptor pool that will hold 10 sets with 1 image each
-    std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}
+    std::vector<GrowableDescriptorAllocator::PoolSizeRatio> sizes = {
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}
     };
 
-    _globalDescriptorAllocator.init_pool(device, 10, sizes);
+    _globalDescriptorAllocator.init(device, 10, sizes);
 
     // make the descriptor set layout for our compute draw
     {
@@ -719,6 +721,9 @@ void VulkanEngine::init_pipelines()
 
     // GRAPHICS PIPELINES
     init_mesh_pipeline();
+
+    // GLTF PIPELINES
+    metalRoughMaterial.build_pipelines(loaded_engine);
 }
 
 void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function) const
@@ -1203,4 +1208,31 @@ void VulkanEngine::init_default_data()
         vkDestroySampler(device, _defaultSamplerNearest, nullptr);
         vkDestroySampler(device, _defaultSamplerLinear, nullptr);
     });
+
+
+    // GLTF DEFAULT DATA
+    GLTFMetallic_Roughness::MaterialResources materialResources;
+    // default the material textures
+    materialResources.colorImage = _whiteImage;
+    materialResources.colorSampler = _defaultSamplerLinear;
+    materialResources.metalRoughImage = _whiteImage;
+    materialResources.metalRoughSampler = _defaultSamplerLinear;
+
+    // set the uniform buffer for the material data
+    auto materialConstants = create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    // write the buffer
+    const auto sceneUniformData = static_cast<GLTFMetallic_Roughness::MaterialConstants*>(materialConstants.allocation->GetMappedData());
+    sceneUniformData->colorFactors = glm::vec4(1,1,1,1);
+    sceneUniformData->metal_rough_factors = glm::vec4(1, 0.5, 0, 0);
+
+    _mainDeletionQueue.push_function([materialConstants, this]
+    {
+        destroy_buffer(materialConstants);
+    });
+
+    materialResources.dataBuffer = materialConstants.buffer;
+    materialResources.dataBufferOffset = 0;
+
+    defaultData = metalRoughMaterial.write_material(device, MaterialPass::MainColor, materialResources, _globalDescriptorAllocator);
 }

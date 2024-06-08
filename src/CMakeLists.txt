@@ -18,7 +18,6 @@ add_executable (engine
   camera.cpp
   camera.h
   GLTFMetallic_Roughness.cpp
-  GLTFMetallic_Roughness.h
 )
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)
