@@ -130,6 +130,8 @@ private:
     GPUSceneData _sceneData;
     VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 
+    VkDescriptorSetLayout _singleImageDescriptorLayout;
+
     VkDescriptorSet _drawImageDescriptors;
     VkDescriptorSetLayout _drawImageDescriptorLayout;
 
@@ -146,7 +148,16 @@ private:
     VkPipelineLayout _meshPipelineLayout;
     VkPipeline _meshPipeline;
 
+    // test resources
     std::vector<std::shared_ptr<MeshAsset>> _testMeshes;
+
+    AllocatedImage _whiteImage;
+    AllocatedImage _blackImage;
+    AllocatedImage _greyImage;
+    AllocatedImage _errorCheckerBoardImage;
+
+    VkSampler _defaultSamplerLinear;
+    VkSampler _defaultSamplerNearest;
 
     //draw loop
     void draw();

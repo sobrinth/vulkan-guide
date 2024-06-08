@@ -583,6 +583,11 @@ void VulkanEngine::init_descriptors()
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         _gpuSceneDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     }
+    {
+        DescriptorLayoutBuilder builder;
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        _singleImageDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+    }
 
     // allocate a descriptor set for our draw image
     _drawImageDescriptors = _globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
@@ -592,6 +597,11 @@ void VulkanEngine::init_descriptors()
 
         writer.update_set(_device, _drawImageDescriptors);
     }
+    _mainDeletionQueue.push_function([&]
+    {
+        // TODO: Move the other DSL here from cleanup()
+        vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
+    });
 
     for (int i = 0; i < FRAME_OVERLAP; i++)
     {
@@ -850,6 +860,17 @@ void VulkanEngine::draw_geometry(const VkCommandBuffer cmd)
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+    // bind a texture
+    auto imageSet = get_current_frame().frameDescriptors.allocate(_device, _singleImageDescriptorLayout);
+    {
+        DescriptorWriter writer;
+        writer.write_image(0, _errorCheckerBoardImage.imageView, _defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+        writer.update_set(_device, imageSet);
+    }
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipelineLayout, 0, 1, &imageSet, 0, nullptr);
+
     // draw loaded meshes
     const glm::mat4 view = glm::translate(glm::vec3{0, 0, -3});
     // camera projection
@@ -858,13 +879,12 @@ void VulkanEngine::draw_geometry(const VkCommandBuffer cmd)
 
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
-    GPUDrawPushConstants push_constants;
     projection[1][1] *= -1;
 
+    GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = projection * view;
-
-
     push_constants.vertexBuffer = _testMeshes[2]->meshBuffers.vertexBufferAddress;
+
     vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants),
                        &push_constants);
     vkCmdBindIndexBuffer(cmd, _testMeshes[2]->meshBuffers.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
@@ -1063,7 +1083,7 @@ void VulkanEngine::destroy_image(const AllocatedImage& img) const
 void VulkanEngine::init_mesh_pipeline()
 {
     VkShaderModule meshFragShader;
-    if (!vkutil::load_shader_module("../../shaders/colored_triangle.frag.spv", _device, &meshFragShader))
+    if (!vkutil::load_shader_module("../../shaders/tex_image.frag.spv", _device, &meshFragShader))
     {
         fmt::print("Error when building the triangle fragment shader module");
     }
@@ -1091,6 +1111,8 @@ void VulkanEngine::init_mesh_pipeline()
     VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
     pipeline_layout_info.pPushConstantRanges = &bufferRange;
     pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pSetLayouts = &_singleImageDescriptorLayout;
+    pipeline_layout_info.setLayoutCount = 1;
 
     VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_meshPipelineLayout));
     PipelineBuilder pipelineBuilder;
@@ -1107,8 +1129,8 @@ void VulkanEngine::init_mesh_pipeline()
     pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
     //no multisampling
     pipelineBuilder.set_multisampling_none();
-    // pipelineBuilder.disable_blending();
-    pipelineBuilder.enable_blending_additive();
+    pipelineBuilder.disable_blending();
+    // pipelineBuilder.enable_blending_additive();
 
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
@@ -1135,6 +1157,39 @@ void VulkanEngine::init_default_data()
 {
     _testMeshes = loadGltfMeshes(this, R"(..\..\assets\basicmesh.glb)").value();
 
+    const uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
+    const uint32_t grey = glm::packUnorm4x8(glm::vec4(0.66f, 0.66f, 0.66f, 1));
+    const uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
+    const uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
+
+    _whiteImage = create_image(&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    _greyImage = create_image(&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    _blackImage = create_image(&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    // checkerboard yay!
+    std::array<uint32_t, 16 * 16> pixels; // 16x16 pixel texture
+    for (int x = 0; x < 16; x++)
+    {
+        for (int y = 0; y < 16; y++)
+        {
+            pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+        }
+    }
+    _errorCheckerBoardImage = create_image(pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    VkSamplerCreateInfo sampl = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+
+        .magFilter = VK_FILTER_NEAREST,
+        .minFilter = VK_FILTER_NEAREST
+    };
+    vkCreateSampler(_device, &sampl, nullptr, &_defaultSamplerNearest);
+
+    sampl.magFilter = VK_FILTER_LINEAR;
+    sampl.minFilter = VK_FILTER_LINEAR;
+    vkCreateSampler(_device, &sampl, nullptr, &_defaultSamplerLinear);
+
+
     _mainDeletionQueue.push_function([this]()
     {
         for (const auto& asset : _testMeshes)
@@ -1142,5 +1197,12 @@ void VulkanEngine::init_default_data()
             destroy_buffer(asset->meshBuffers.indexBuffer);
             destroy_buffer(asset->meshBuffers.vertexBuffer);
         }
+        destroy_image(_whiteImage);
+        destroy_image(_greyImage);
+        destroy_image(_blackImage);
+        destroy_image(_errorCheckerBoardImage);
+
+        vkDestroySampler(_device, _defaultSamplerNearest, nullptr);
+        vkDestroySampler(_device, _defaultSamplerLinear, nullptr);
     });
 }
