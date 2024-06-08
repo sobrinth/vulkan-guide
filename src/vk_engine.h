@@ -69,6 +69,7 @@ class VulkanEngine
 public:
     VulkanEngine() = default;
 
+    VkDevice device; // Vulkan device for commands
     static VulkanEngine& Get();
 
     //initializes everything in the engine
@@ -97,7 +98,6 @@ private:
     VkInstance _instance; // Vulkan library handle
     VkDebugUtilsMessengerEXT _debugMessenger; // Vulkan debug output handle
     VkPhysicalDevice _chosenGpu; // GPU chosen as the default device
-    VkDevice _device; // Vulkan device for commands
     VkSurfaceKHR _surface; // Vulkan window surface
 
     // FrameData
