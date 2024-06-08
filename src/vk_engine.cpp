@@ -903,7 +903,8 @@ void VulkanEngine::draw_geometry(const VkCommandBuffer cmd)
     writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(device, globalDescriptor);
 
-    for (const RenderObject& draw : mainDrawContext.opaqueSurfaces)
+
+    auto draw = [&](const RenderObject& draw)
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
@@ -917,9 +918,23 @@ void VulkanEngine::draw_geometry(const VkCommandBuffer cmd)
         vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
         vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+    };
+
+    for (auto& r : mainDrawContext.opaqueSurfaces)
+    {
+        draw(r);
+    }
+
+    for (auto& r : mainDrawContext.transparentSurfaces)
+    {
+        draw(r);
     }
 
     vkCmdEndRendering(cmd);
+
+    // we delete the draw commands now that we processed them
+    mainDrawContext.opaqueSurfaces.clear();
+    mainDrawContext.transparentSurfaces.clear();
 }
 
 AllocatedBuffer VulkanEngine::create_buffer(const size_t allocSize,
@@ -1250,7 +1265,6 @@ void VulkanEngine::update_scene()
     // to opengl and gltf axis
     projection[1][1] *= -1;
 
-    mainDrawContext.opaqueSurfaces.clear();
 
     sceneData.view = view;
     sceneData.proj = projection;
@@ -1279,7 +1293,14 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
         def.transform = nodeMatrix;
         def.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
 
-        ctx.opaqueSurfaces.push_back(def);
+        if (s.material->data.passType == MaterialPass::Transparent)
+        {
+            ctx.transparentSurfaces.push_back(def);
+        }
+        else
+        {
+            ctx.opaqueSurfaces.push_back(def);
+        }
     }
 
     // Recurse down
