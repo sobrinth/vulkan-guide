@@ -88,6 +88,15 @@ struct MeshNode : public Node
     virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
 };
 
+struct EngineStats
+{
+    float frametime;
+    int triangle_count;
+    int drawcall_count;
+    float scene_update_time;
+    float mesh_draw_time;
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 struct GLTFMetallic_Roughness
@@ -152,6 +161,8 @@ public:
 
     VkSampler _defaultSamplerLinear;
     VkSampler _defaultSamplerNearest;
+
+    EngineStats engineStats;
 
     //initializes everything in the engine
     void init();
