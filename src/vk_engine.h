@@ -8,6 +8,7 @@
 
 #include <ranges>
 
+#include "camera.h"
 #include "vk_descriptors.h"
 #include "vk_loader.h"
 
@@ -74,6 +75,18 @@ struct RenderObject
     VkDeviceAddress vertexBufferAddress;
 };
 
+struct DrawContext
+{
+    std::vector<RenderObject> opaqueSurfaces;
+};
+
+struct MeshNode : public Node
+{
+    std::shared_ptr<MeshAsset> mesh;
+
+    virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 struct GLTFMetallic_Roughness
@@ -125,6 +138,8 @@ public:
 
     MaterialInstance defaultData;
     GLTFMetallic_Roughness metalRoughMaterial;
+
+    Camera mainCamera;
 
     //initializes everything in the engine
     void init();
@@ -181,7 +196,7 @@ private:
 
     GrowableDescriptorAllocator _globalDescriptorAllocator;
 
-    GPUSceneData _sceneData;
+    GPUSceneData sceneData;
     VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 
     VkDescriptorSetLayout _singleImageDescriptorLayout;
@@ -213,6 +228,9 @@ private:
     VkSampler _defaultSamplerLinear;
     VkSampler _defaultSamplerNearest;
 
+    DrawContext mainDrawContext;
+    std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+
     //draw loop
     void draw();
 
@@ -241,4 +259,6 @@ private:
 
     void init_mesh_pipeline();
     void init_default_data();
+
+    void update_scene();
 };
