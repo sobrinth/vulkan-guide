@@ -119,7 +119,9 @@ struct GLTFMetallic_Roughness
     void build_pipelines(VulkanEngine* engine);
     void clear_resources(VkDevice device) const;
 
-    MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources,
+    MaterialInstance write_material(VkDevice device,
+                                    MaterialPass pass,
+                                    const MaterialResources& resources,
                                     GrowableDescriptorAllocator& descriptorAllocator);
 };
 
@@ -138,8 +140,17 @@ public:
 
     MaterialInstance defaultData;
     GLTFMetallic_Roughness metalRoughMaterial;
+    std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
 
     Camera mainCamera;
+
+    AllocatedImage _whiteImage;
+    AllocatedImage _blackImage;
+    AllocatedImage _greyImage;
+    AllocatedImage _errorCheckerBoardImage;
+
+    VkSampler _defaultSamplerLinear;
+    VkSampler _defaultSamplerNearest;
 
     //initializes everything in the engine
     void init();
@@ -154,6 +165,9 @@ public:
     AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false) const;
     AllocatedImage create_image(const void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false) const;
     void destroy_image(const AllocatedImage& img) const;
+
+    [[nodiscard]] AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) const;
+    void destroy_buffer(const AllocatedBuffer& buffer) const;
 
 private:
     bool _isInitialized{false};
@@ -217,19 +231,7 @@ private:
     VkPipelineLayout _meshPipelineLayout;
     VkPipeline _meshPipeline;
 
-    // test resources
-    std::vector<std::shared_ptr<MeshAsset>> _testMeshes;
-
-    AllocatedImage _whiteImage;
-    AllocatedImage _blackImage;
-    AllocatedImage _greyImage;
-    AllocatedImage _errorCheckerBoardImage;
-
-    VkSampler _defaultSamplerLinear;
-    VkSampler _defaultSamplerNearest;
-
     DrawContext mainDrawContext;
-    std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
 
     //draw loop
     void draw();
@@ -254,8 +256,6 @@ private:
 
     void draw_geometry(VkCommandBuffer cmd);
 
-    [[nodiscard]] AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) const;
-    void destroy_buffer(const AllocatedBuffer& buffer) const;
 
     void init_mesh_pipeline();
     void init_default_data();

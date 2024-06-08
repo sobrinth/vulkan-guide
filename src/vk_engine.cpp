@@ -82,6 +82,13 @@ void VulkanEngine::init()
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
 
+    std::string structurePath = {R"(..\..\assets\structure.glb)"};
+    auto structureFile = loadGltf(this, structurePath);
+
+    assert(structureFile.has_value());
+
+    loadedScenes["structure"] = *structureFile;
+
     // everything went fine
     _isInitialized = true;
 }
@@ -92,6 +99,8 @@ void VulkanEngine::cleanup()
     {
         // make sure the gpu has stopped doing its tings
         vkDeviceWaitIdle(device);
+
+        loadedScenes.clear();
 
         metalRoughMaterial.clear_resources(device);
 
@@ -1155,8 +1164,6 @@ void VulkanEngine::init_mesh_pipeline()
 
 void VulkanEngine::init_default_data()
 {
-    _testMeshes = loadGltfMeshes(this, R"(..\..\assets\basicmesh.glb)").value();
-
     const uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
     const uint32_t grey = glm::packUnorm4x8(glm::vec4(0.66f, 0.66f, 0.66f, 1));
     const uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
@@ -1192,11 +1199,6 @@ void VulkanEngine::init_default_data()
 
     _mainDeletionQueue.push_function([this]()
     {
-        for (const auto& asset : _testMeshes)
-        {
-            destroy_buffer(asset->meshBuffers.indexBuffer);
-            destroy_buffer(asset->meshBuffers.vertexBuffer);
-        }
         destroy_image(_whiteImage);
         destroy_image(_greyImage);
         destroy_image(_blackImage);
@@ -1233,22 +1235,6 @@ void VulkanEngine::init_default_data()
     materialResources.dataBufferOffset = 0;
 
     defaultData = metalRoughMaterial.write_material(device, MaterialPass::MainColor, materialResources, _globalDescriptorAllocator);
-
-    for (auto& m : _testMeshes)
-    {
-        std::shared_ptr<MeshNode> node = std::make_shared<MeshNode>();
-        node->mesh = m;
-
-        node->localTransform = glm::mat4{1.f};
-        node->worldTransform = glm::mat4{1.f};
-
-        for (auto& s : node->mesh->surfaces)
-        {
-            s.material = std::make_shared<GLTFMaterial>(defaultData);
-        }
-
-        loadedNodes[m->name] = std::move(node);
-    }
 }
 
 void VulkanEngine::update_scene()
@@ -1258,7 +1244,7 @@ void VulkanEngine::update_scene()
     glm::mat4 view = mainCamera.getViewMatrix();
 
     // camera projection
-    glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float) _windowExtent.height, 10000.f, 0.1f);
+    glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
 
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
@@ -1270,20 +1256,12 @@ void VulkanEngine::update_scene()
     sceneData.proj = projection;
     sceneData.viewproj = sceneData.proj * sceneData.view;
 
-    loadedNodes["Suzanne"]->Draw(glm::mat4(1.f), mainDrawContext);
+    loadedScenes["structure"]->Draw(glm::mat4{1.f}, mainDrawContext);
 
     //some default lighting parameters
     sceneData.ambientColor = glm::vec4(.1f);
     sceneData.sunlightColor = glm::vec4(1.f);
     sceneData.sunlightDirection = glm::vec4(0, 1, 0.5, 1.f);
-
-    for (int x = -4; x < 4; x++)
-    {
-        glm::mat4 scale = glm::scale(glm::vec3{0.2});
-        glm::mat4 translation = glm::translate(glm::vec3{x, 1, 0});
-
-        loadedNodes["Cube"]->Draw(translation * scale, mainDrawContext);
-    }
 }
 
 void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
